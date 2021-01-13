@@ -30,91 +30,121 @@
 /* App includes */
 #include "../UART/uart.h"
 
-/* The rate at which the LED LD5 should flash */
-#define LED_FLASH_PERIOD_MS 	( 250 / portTICK_RATE_MS )
-#define INTERF_TASK_PERIOD_MS 	( 3000 / portTICK_RATE_MS )
-#define INTERF_LOAD_MS          ( 1000 / portTICK_RATE_MS)
+/* Periods of the tasks*/
+#define SENSOR_PERIOD_MS    (100 / portTICK_RATE_MS)
+#define SW_INT_PERIOD_MS    (500 / portTICK_RATE_MS)
+#define BT_INT_PERIOD_MS    (150 / portTICK_RATE_MS)
+#define KEY_INT_PERIOD_MS   (100 / portTICK_RATE_MS)
+#define DECISION_PERIOD_MS  (80 / portTICK_RATE_MS)
+//#define ACTUATION_PERIOD_MS (100 / portTICK_RATE_MS)
 
-/* Priorities of the demo application tasks (high numb. -> high prio.) */
-#define LED_FLASH_PRIORITY	( tskIDLE_PRIORITY + 2 )
-#define INTERF_PRIORITY	    ( tskIDLE_PRIORITY + 1 )
+/* Priorities of the application tasks (high numb. -> high prio.) */
+#define SENSOR_ACQ_PRIORITY (tskIDLE_PRIORITY + 2)
+#define SW_INT_PRIORITY     (tskIDLE_PRIORITY + 2)
+#define BT_INT_PRIORITY     (tskIDLE_PRIORITY + 2)
+#define KEY_INT_PRIORITY    (tskIDLE_PRIORITY + 2)
+#define DECISION_PRIORITY   (tskIDLE_PRIORITY + 3)
+#define ACTUATION_PRIORITY  (tskIDLE_PRIORITY + 3)
 
-#define ACQ_PERIOD_MS   (100 / portTICK_RATE_MS)
-#define PROC_PERIOD_MS  (500 / portTICK_RATE_MS)
-#define OUT_PERIOD_MS   (600 / portTICK_RATE_MS)
+#define NR_ADC_SAMPLES 5
 
-#define ACQ_PRIORITY    (tskIDLE_PRIORITY + 3)
-#define PROC_PRIORITY   (tskIDLE_PRIORITY + 2)
-#define OUT_PRIORITY    (tskIDLE_PRIORITY + 1)
 
-#define NR_SAMPLES 5
+uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que bem do LDR / ADC
+uint8_t mode = 1; //system mode
+uint32_t light_int; //Light intensity value OC1R - valor com a luz há de ficar
+uint8_t on_off;
+uint8_t keyboard_enable; // 0 - disable     1 - enable
+
+
+
+
+
+
+
 
 /*
  * Prototypes and tasks
  */
-uint32_t res[NR_SAMPLES];
-double mean;
 
-void pvAcq(void *pvParam)
+
+void sensorAcq(void *pvParam)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
-    
-    uint8_t i = 0;
         
     for(;;){
-        vTaskDelayUntil(&xLastWakeTime, ACQ_PERIOD_MS);
+        vTaskDelayUntil(&xLastWakeTime, SENSOR_PERIOD_MS);
         
-        IFS1bits.AD1IF = 0; // Reset interrupt flag
-        AD1CON1bits.ASAM=1; // Start conversion
-        while(IFS1bits.AD1IF == 0); // Wait for EOC
-        // Convert to 0..3.3V (in mV)
-        res[i] = (ADC1BUF0 * 3300) / 1023;
         
-        i++;
-        if(i>4)
-            i = 0; 
     }
     
 }
 
-void pvProc(void *pvParam)
+void swInt(void *pvParam)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
-    uint32_t sum = 0;
-    uint8_t i;
     
     for(;;){
-        vTaskDelayUntil(&xLastWakeTime, PROC_PERIOD_MS);
-        for(i=0;i<NR_SAMPLES;i++){
-            sum += res[i];
-        }
-        mean = sum/5.0;
-        sum = 0;
+        vTaskDelayUntil(&xLastWakeTime, SW_INT_PERIOD_MS);
+        
     }
     
 }
 
-void pvOut(void *pvParam)
+void btInt(void *pvParam)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
     
-    uint8_t mesg[80];
     
     for(;;){
-        vTaskDelayUntil(&xLastWakeTime, OUT_PERIOD_MS);
+        vTaskDelayUntil(&xLastWakeTime, BT_INT_PERIOD_MS);
         
-        sprintf(mesg, "Mean Voltage: %4.1f\n\r", mean);
-        PrintStr(mesg);
     }
     
 }
+
+void keyInt(void *pvParam)
+{
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    
+    
+    for(;;){
+        vTaskDelayUntil(&xLastWakeTime, KEY_INT_PERIOD_MS);
+        
+    }
+    
+}
+
+void decision(void *pvParam)
+{
+    TickType_t xLastWakeTime;
+    xLastWakeTime = xTaskGetTickCount();
+    
+    
+    for(;;){
+        vTaskDelayUntil(&xLastWakeTime, DECISION_PERIOD_MS);
+        
+        
+    }
+    
+}
+
+void actuation(void *pvParam)
+{
+    
+    
+}
+
+
+
+
 /*
- * Create the demo tasks then start the scheduler.
+ * Create the tasks then start the scheduler.
  */
-int main3a( void )
+int mainLightController( void )
 {   
     // ADC config.
     AD1CON1bits.SSRC=7; // Internal counter ends sampling and starts conversion
@@ -146,9 +176,12 @@ int main3a( void )
     
       
     /* Create the tasks defined within this file. */
-    xTaskCreate( pvAcq, ( const signed char * const ) "Acq", configMINIMAL_STACK_SIZE, NULL, ACQ_PRIORITY, NULL );
-    xTaskCreate( pvProc, ( const signed char * const ) "Proc", configMINIMAL_STACK_SIZE, NULL, PROC_PRIORITY, NULL );
-    xTaskCreate( pvOut, ( const signed char * const ) "Out", configMINIMAL_STACK_SIZE, NULL, OUT_PRIORITY, NULL );
+    xTaskCreate( sensorAcq, ( const signed char * const ) "sensorAcq", configMINIMAL_STACK_SIZE, NULL, SENSOR_ACQ_PRIORITY, NULL );
+    xTaskCreate( swInt, ( const signed char * const ) "swInt", configMINIMAL_STACK_SIZE, NULL, SW_INT_PRIORITY, NULL );
+    xTaskCreate( btInt, ( const signed char * const ) "btInt", configMINIMAL_STACK_SIZE, NULL, BT_INT_PRIORITY, NULL );
+    xTaskCreate( keyInt, ( const signed char * const ) "keyInt", configMINIMAL_STACK_SIZE, NULL, KEY_INT_PRIORITY, NULL );
+    xTaskCreate( decision, ( const signed char * const ) "decision", configMINIMAL_STACK_SIZE, NULL, DECISION_PRIORITY, NULL );
+    xTaskCreate( actuation, ( const signed char * const ) "actuation", configMINIMAL_STACK_SIZE, NULL, ACTUATION_PRIORITY, NULL );
 
         /* Finally start the scheduler. */
 	vTaskStartScheduler();

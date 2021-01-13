@@ -83,7 +83,7 @@ int main( void )
 	prvSetupHardware();
 
     /* Run application */
-    main3a();
+    mainLightController();
     
 	return 0;
 }
