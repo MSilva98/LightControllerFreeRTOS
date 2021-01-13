@@ -39,7 +39,7 @@
       <itemPath>../main.c</itemPath>
       <itemPath>../ConfigPerformance.c</itemPath>
       <itemPath>../../UART/uart.c</itemPath>
-      <itemPath>../main3.c</itemPath>
+      <itemPath>../mainLightController.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

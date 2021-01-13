@@ -6,13 +6,13 @@
 
 # Macros
 TOP=`pwd`
-CND_CONF=EXPLORER_16_PIC32MX795
+CND_CONF=USB-II_STARTER_KIT
 CND_DISTDIR=dist
 TMPDIR=build/${CND_CONF}/${IMAGE_TYPE}/tmp-packaging
 TMPDIRNAME=tmp-packaging
-OUTPUT_PATH=dist/${CND_CONF}/${IMAGE_TYPE}/RTOSDemo.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
-OUTPUT_BASENAME=RTOSDemo.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
-PACKAGE_TOP_DIR=rtosdemo.x/
+OUTPUT_PATH=dist/${CND_CONF}/${IMAGE_TYPE}/LightController.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
+OUTPUT_BASENAME=LightController.X.${IMAGE_TYPE}.${OUTPUT_SUFFIX}
+PACKAGE_TOP_DIR=lightcontroller.x/
 
 # Functions
 function checkReturnCode
@@ -57,15 +57,15 @@ mkdir -p ${TMPDIR}
 
 # Copy files and create directories and links
 cd "${TOP}"
-makeDirectory ${TMPDIR}/rtosdemo.x/bin
+makeDirectory ${TMPDIR}/lightcontroller.x/bin
 copyFileToTmpDir "${OUTPUT_PATH}" "${TMPDIR}/${PACKAGE_TOP_DIR}bin/${OUTPUT_BASENAME}" 0755
 
 
 # Generate tar file
 cd "${TOP}"
-rm -f ${CND_DISTDIR}/${CND_CONF}/package/rtosdemo.x.tar
+rm -f ${CND_DISTDIR}/${CND_CONF}/package/lightcontroller.x.tar
 cd ${TMPDIR}
-tar -vcf ../../../../${CND_DISTDIR}/${CND_CONF}/package/rtosdemo.x.tar *
+tar -vcf ../../../../${CND_DISTDIR}/${CND_CONF}/package/lightcontroller.x.tar *
 checkReturnCode
 
 # Cleanup
