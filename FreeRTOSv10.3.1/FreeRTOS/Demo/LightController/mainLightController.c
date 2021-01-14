@@ -72,7 +72,7 @@ struct QueueLightData_Type {
 
 uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que vem do LDR / ADC
 uint8_t mode = 1; //system mode
-uint32_t light_int = PRVALUE/2; //Light intensity value OC1R - valor com a luz há de ficar
+int light_int = PRVALUE/2; //Light intensity value OC1R - valor com a luz há de ficar
 uint8_t on_off = 1;
 uint8_t swModes_enable = 1; // 0 - disable     1 - enable
 uint8_t swOnOff_enable = 1; // 0 - disable     1 - enable
@@ -85,8 +85,8 @@ int light_on_3 = (100*PRVALUE)/100; //Valor quando a luz está "ligada"
 
 //default values mode 4
 int ligth_level = 200; //valor de intensidade pretendido
-int maxL = (0*PRVALUE)/100; 
-int minL = (100*PRVALUE)/100;
+int minL = (0*PRVALUE)/100; 
+int maxL = (100*PRVALUE)/100;
 
 
 /*
@@ -180,8 +180,8 @@ void btInt(void *pvParam)
             // no_preemption
             printf("Press BT R -\n\r");
             light_int = light_int - INC_DEC_VALUE;
-            if(light_int<1){
-                light_int = 1;
+            if(light_int<0){
+                light_int = 0;
             }
             // preemption
         }
@@ -216,6 +216,10 @@ void keyInt(void *pvParam)
                 }
             }else if(byte == 99 || byte == 67){ //C or c
                 //config
+                // semaforo nos prints
+                //config, stop prints
+                //sinaliza task config
+                // prioridade do config tem de ser inferior a todas as outras
             }else if(byte == 97 || byte == 65){ //a or A
                 printf("Press A \n\r");
                 if(swModes_enable == 0){
@@ -244,8 +248,8 @@ void keyInt(void *pvParam)
             }else if(byte == 45){ //-
                 printf("Press - \n\r");
                 light_int = light_int - INC_DEC_VALUE;
-                if(light_int<1){
-                    light_int = 1;
+                if(light_int<0){
+                    light_int = 0;
                 }
             }
         }
@@ -279,6 +283,7 @@ void decision(void *pvParam)
                 break;
             case 3:
                 printf("Mode 3 \n\r");
+                avg_ldr = 0;
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
@@ -295,16 +300,27 @@ void decision(void *pvParam)
                 break;
             case 4:
                 printf("Mode 4 \n\r");
+                avg_ldr = 0;
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
                 avg_ldr = avg_ldr/NR_ADC_SAMPLES;
+                printf("LDR %f \n\r", avg_ldr);
                 if(avg_ldr < ligth_level - 20){
-                    QLightData.light_val = light_int + 15;
+                    light_int = light_int - INC_DEC_VALUE;
+                    if(light_int<minL){
+                        light_int = minL;
+                    }
+                    QLightData.light_val = light_int;
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }else if(avg_ldr > ligth_level + 20){
-                    QLightData.light_val = light_int - 15;
+                    
+                    light_int = light_int + INC_DEC_VALUE;
+                    if(light_int>maxL){
+                        light_int = maxL;
+                    }
+                    QLightData.light_val = light_int;
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }
@@ -322,13 +338,16 @@ void actuation(void *pvParam)
         xStatus=xQueueReceive(xLightQueue,(void *)&QLightData,portMAX_DELAY);
         if(QLightData.on_off == 0){
             printf("OFF \n\r");
-            OC1RS = 0;
+            OC1R = 0;
             LED_TRIS = 1;
         }else{
             printf("ON %d \n\r", QLightData.light_val);
-            OC1RS = QLightData.light_val;
-            //LED_PIN = 1;
-            LED_TRIS = 0;
+            OC1R = QLightData.light_val;
+            if(QLightData.light_val == 0){
+                LED_TRIS = 1;
+            }else{
+                LED_TRIS = 0;
+            }
         }
     }
 }
@@ -415,13 +434,13 @@ int mainLightController( void )
 }
 
 void visr_tmr2(void){
-    LED_PIN = 0;
+    LED_PIN = 1;
     IFS0bits.T2IF = 0;
 
 }
 
 void visr_oc1(void){
-    LED_PIN = 1;
+    LED_PIN = 0;
     IFS0bits.OC1IF=0;
     OC1CONbits.ON=1;
 }
