@@ -72,10 +72,10 @@ struct QueueLightData_Type {
 
 uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que vem do LDR / ADC
 uint8_t mode = 1; //system mode
-uint32_t light_int; //Light intensity value OC1R - valor com a luz há de ficar
-uint8_t on_off;
-uint8_t swModes_enable; // 0 - disable     1 - enable
-uint8_t swOnOff_enable; // 0 - disable     1 - enable
+uint32_t light_int = PRVALUE/2; //Light intensity value OC1R - valor com a luz há de ficar
+uint8_t on_off = 1;
+uint8_t swModes_enable = 1; // 0 - disable     1 - enable
+uint8_t swOnOff_enable = 1; // 0 - disable     1 - enable
 
 //default values mode 3
 int intensity_light_onOff = (20*MAXLDR)/100; //intensidade a que a luz liga e desliga
@@ -129,6 +129,7 @@ void swInt(void *pvParam)
             // no_preemption
             switch(10*MODE_SW_1 + MODE_SW_0){
                 case 0:
+                    
                     mode = 1;
                     break;
                     
@@ -168,6 +169,7 @@ void btInt(void *pvParam)
         vTaskDelayUntil(&xLastWakeTime, BT_INT_PERIOD_MS);
         if(LEFT_BUTTON){        // increase
             // no_preemption
+            printf("Press BT L + \n\r");
             light_int = light_int + INC_DEC_VALUE;
             if(light_int>PRVALUE){
                 light_int = PRVALUE;
@@ -176,6 +178,7 @@ void btInt(void *pvParam)
         }
         if(RIGHT_BUTTON){ // decrease
             // no_preemption
+            printf("Press BT R -\n\r");
             light_int = light_int - INC_DEC_VALUE;
             if(light_int<1){
                 light_int = 1;
@@ -198,12 +201,14 @@ void keyInt(void *pvParam)
         
         if(GetChar( &byte ) == UART_SUCCESS){
             if(byte == 116 || byte == 84){ //t or T
+                printf("Press T \n\r");
                 if(on_off == 0){
                     on_off = 1;
                 }else{
                     on_off = 0;
                 }
             }else if(byte == 121 || byte == 89){ // y or Y
+                printf("Press Y \n\r");
                 if(swOnOff_enable == 0){
                     swOnOff_enable = 1;
                 }else{
@@ -212,25 +217,32 @@ void keyInt(void *pvParam)
             }else if(byte == 99 || byte == 67){ //C or c
                 //config
             }else if(byte == 97 || byte == 65){ //a or A
+                printf("Press A \n\r");
                 if(swModes_enable == 0){
                     swModes_enable = 1;
                 }else{
                     swModes_enable = 0;
                 }
             }else if(byte == 49){ //1
+                printf("Press 1 \n\r");
                 mode = 1;
             }else if(byte == 50){ //2
+                printf("Press 2 \n\r");
                 mode = 2;
             }else if(byte == 51){ //3
+                printf("Press 3 \n\r");
                 mode = 3;
             }else if(byte == 52){ //4
+                printf("Press 4 \n\r");
                 mode = 4;
             }else if(byte == 43){ //+
+                printf("Press + \n\r");
                 light_int = light_int + INC_DEC_VALUE;
                 if(light_int>PRVALUE){
                     light_int = PRVALUE;
                 }
             }else if(byte == 45){ //-
+                printf("Press - \n\r");
                 light_int = light_int - INC_DEC_VALUE;
                 if(light_int<1){
                     light_int = 1;
@@ -254,16 +266,19 @@ void decision(void *pvParam)
         vTaskDelayUntil(&xLastWakeTime, DECISION_PERIOD_MS);
         switch (mode){
             case 1:
-                QLightData.light_val = light_int;
+                printf("Mode 1 \n\r");
+                QLightData.light_val = PRVALUE;
                 QLightData.on_off = on_off;
                 xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 break;
             case 2:
+                printf("Mode 2 \n\r");
                 QLightData.light_val = light_int;
                 QLightData.on_off = on_off;
                 xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 break;
             case 3:
+                printf("Mode 3 \n\r");
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
@@ -279,6 +294,7 @@ void decision(void *pvParam)
                 }
                 break;
             case 4:
+                printf("Mode 4 \n\r");
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
@@ -304,11 +320,15 @@ void actuation(void *pvParam)
     
     for(;;){
         xStatus=xQueueReceive(xLightQueue,(void *)&QLightData,portMAX_DELAY);
-        if(QLightData.on_off = 0){
+        if(QLightData.on_off == 0){
+            printf("OFF \n\r");
             OC1RS = 0;
             LED_TRIS = 1;
         }else{
+            printf("ON %d \n\r", QLightData.light_val);
             OC1RS = QLightData.light_val;
+            //LED_PIN = 1;
+            LED_TRIS = 0;
         }
     }
 }
@@ -362,6 +382,8 @@ int mainLightController( void )
     
     void __attribute__( (interrupt(IPL2AUTO), vector(_OUTPUT_COMPARE_1_VECTOR))) visr_oc1(void);
     
+    timer2control(1);
+    
 	// Init UART and redirect tdin/stdot/stderr to UART
     if(UartInit(configPERIPHERAL_CLOCK_HZ, 115200) != UART_SUCCESS) {
         PORTAbits.RA3 = 1; // If Led active error initializing UART
@@ -393,13 +415,13 @@ int mainLightController( void )
 }
 
 void visr_tmr2(void){
-    LED_PIN = 1;
+    LED_PIN = 0;
     IFS0bits.T2IF = 0;
 
 }
 
 void visr_oc1(void){
-    LED_PIN = 0;
+    LED_PIN = 1;
     IFS0bits.OC1IF=0;
     OC1CONbits.ON=1;
 }
