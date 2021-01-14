@@ -70,7 +70,7 @@ struct QueueLightData_Type {
 
 /*global vars*/
 
-uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que bem do LDR / ADC
+uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que vem do LDR / ADC
 uint8_t mode = 1; //system mode
 uint32_t light_int; //Light intensity value OC1R - valor com a luz há de ficar
 uint8_t on_off;
@@ -89,8 +89,6 @@ int maxL = (0*PRVALUE)/100;
 int minL = (100*PRVALUE)/100;
 
 
-
-
 /*
  * Prototypes and tasks
  */
@@ -100,11 +98,22 @@ void sensorAcq(void *pvParam)
 {
     TickType_t xLastWakeTime;
     xLastWakeTime = xTaskGetTickCount();
-        
+    
+    uint8_t i = 0;
+    
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, SENSOR_PERIOD_MS);
         
-        
+        IFS1bits.AD1IF = 0; // Reset interrupt flag
+        AD1CON1bits.ASAM=1; // Start conversion
+        while(IFS1bits.AD1IF == 0); // Wait for EOC
+        // no_preemption
+        ldr_values[i] = ADC1BUF0;
+        // preemption
+        i++;
+        if(i>NR_ADC_SAMPLES)
+            i = 0;
+            
     }
     
 }
@@ -116,7 +125,35 @@ void swInt(void *pvParam)
     
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, SW_INT_PERIOD_MS);
-        
+        if(swModes_enable){
+            // no_preemption
+            switch(10*MODE_SW_1 + MODE_SW_0){
+                case 0:
+                    mode = 1;
+                    break;
+                    
+                case 1:
+                    mode = 2;
+                    break;
+                    
+                case 10:
+                    mode = 3;
+                    break;
+                    
+                case 11:
+                    mode = 4;
+                    break;
+                    
+                default:
+                    break;
+            }
+            // preemption
+        }
+        if(swOnOff_enable == 1){
+            // no_preemption
+            on_off = SW_ON_OFF_PIN;
+            // preemption
+        }
     }
     
 }
@@ -129,7 +166,22 @@ void btInt(void *pvParam)
     
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, BT_INT_PERIOD_MS);
-        
+        if(LEFT_BUTTON){        // increase
+            // no_preemption
+            light_int = light_int + INC_DEC_VALUE;
+            if(light_int>PRVALUE){
+                light_int = PRVALUE;
+            }
+            // preemption
+        }
+        if(RIGHT_BUTTON){ // decrease
+            // no_preemption
+            light_int = light_int - INC_DEC_VALUE;
+            if(light_int<1){
+                light_int = 1;
+            }
+            // preemption
+        }
     }
     
 }
@@ -185,7 +237,6 @@ void keyInt(void *pvParam)
                 }
             }
         }
-        
     }
     
 }
@@ -255,6 +306,7 @@ void actuation(void *pvParam)
         xStatus=xQueueReceive(xLightQueue,(void *)&QLightData,portMAX_DELAY);
         if(QLightData.on_off = 0){
             OC1RS = 0;
+            LED_TRIS = 1;
         }else{
             OC1RS = QLightData.light_val;
         }
@@ -269,6 +321,14 @@ void actuation(void *pvParam)
  */
 int mainLightController( void )
 {   
+    
+    LED_TRIS = 0;
+    SW_ON_OFF_TRIS = 1;
+    TRIS_SW_0 = 1;
+    TRIS_SW_1 = 1;
+    LEFT_BUTTON_TRIS = 1;
+    RIGHT_BUTTON_TRIS = 1;
+    
     // ADC config.
     AD1CON1bits.SSRC=7; // Internal counter ends sampling and starts conversion
     AD1CON1bits.CLRASAM=1; //Stop conversion when 1st A/D converter interrupt is

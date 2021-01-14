@@ -8,6 +8,10 @@
             <file>file:/C:/E/Dev/FreeRTOS/WorkingCopy/FreeRTOS/Demo/PIC32MX_MPLAB/lcd.c</file>
             <file>file:/C:/E/Dev/FreeRTOS/WorkingCopy/FreeRTOS/Demo/PIC32MX_MPLAB/main_full.c</file>
         </group>
-        <group/>
+        <group>
+            <file>file:/home/msilva/5ano/1semestre/PSE/RealTime_Systems/LightControllerFreeRTOS/FreeRTOSv10.3.1/FreeRTOS/Demo/LightController/timer2.h</file>
+            <file>file:/home/msilva/5ano/1semestre/PSE/RealTime_Systems/LightControllerFreeRTOS/FreeRTOSv10.3.1/FreeRTOS/Demo/LightController/mainLightController.c</file>
+            <file>file:/home/msilva/5ano/1semestre/PSE/RealTime_Systems/LightControllerFreeRTOS/FreeRTOSv10.3.1/FreeRTOS/Demo/LightController/myMax32.h</file>
+        </group>
     </open-files>
 </project-private>
