@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "uart.h"
+#include <math.h>
 
 /********************************************************************
 * Function: 	UartInit()
@@ -160,4 +161,27 @@ void PrintStr(uint8_t *txStr)
 
 /***************************************End Of File*************************************/
 
+// Read a number of * digits from the terminal
 
+int getNumber(int digit_size){
+    uint8_t byte;
+    int num = 0;
+    uint8_t string[digit_size];
+    int j = 0;
+    do{
+        while( GetChar( &byte ) != UART_SUCCESS);
+        PutChar( byte );
+        if(byte >= 48 && byte <= 57)
+        {
+            string[j] = byte;
+            j++;
+        }
+    }while(byte !=13 && j < digit_size);
+    int i;
+    int exp = (int)pow(10, j - 1);
+    for(i = 0; i < j; ++i){
+        num = num + exp*(string[i]-48);
+        exp = exp/10;
+    }
+    return num;
+}

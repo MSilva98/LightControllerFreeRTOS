@@ -34,6 +34,6 @@ int UartClose(void);
 int GetChar(uint8_t *byte);
 void PutChar(uint8_t txChar);
 void PrintStr(uint8_t *txStr);
-
+int getNumber(int digit_size);
 
 #endif

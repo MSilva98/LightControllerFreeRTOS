@@ -40,6 +40,7 @@
 #define BT_INT_PERIOD_MS    (150 / portTICK_RATE_MS)
 #define KEY_INT_PERIOD_MS   (100 / portTICK_RATE_MS)
 #define DECISION_PERIOD_MS  (80 / portTICK_RATE_MS)
+#define PRINTS_PERIOD_MS  (80 / portTICK_RATE_MS)
 //#define ACTUATION_PERIOD_MS (100 / portTICK_RATE_MS)
 
 /* Priorities of the application tasks (high numb. -> high prio.) */
@@ -49,6 +50,8 @@
 #define KEY_INT_PRIORITY    (tskIDLE_PRIORITY + 2)
 #define DECISION_PRIORITY   (tskIDLE_PRIORITY + 3)
 #define ACTUATION_PRIORITY  (tskIDLE_PRIORITY + 3)
+#define CONFIG_PRIORITY      (tskIDLE_PRIORITY + 1)
+#define PRINTS_PRIORITY      (tskIDLE_PRIORITY + 1)
 
 #define NR_ADC_SAMPLES 5
 #define INC_DEC_VALUE 10
@@ -66,7 +69,7 @@ struct QueueLightData_Type {
     uint8_t on_off;
 };
 
-
+static TaskHandle_t xConfig = NULL, xKeyInt = NULL, xPrints = NULL;
 
 /*global vars*/
 
@@ -131,18 +134,22 @@ void swInt(void *pvParam)
                 case 0:
                     
                     mode = 1;
+                    xTaskNotifyGive( xPrints );
                     break;
                     
                 case 1:
                     mode = 2;
+                    xTaskNotifyGive( xPrints );
                     break;
                     
                 case 10:
                     mode = 3;
+                    xTaskNotifyGive( xPrints );
                     break;
                     
                 case 11:
                     mode = 4;
+                    xTaskNotifyGive( xPrints );
                     break;
                     
                 default:
@@ -153,6 +160,7 @@ void swInt(void *pvParam)
         if(swOnOff_enable == 1){
             // no_preemption
             on_off = SW_ON_OFF_PIN;
+            xTaskNotifyGive( xPrints );
             // preemption
         }
     }
@@ -198,47 +206,48 @@ void keyInt(void *pvParam)
     
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, KEY_INT_PERIOD_MS);
-        
         if(GetChar( &byte ) == UART_SUCCESS){
             if(byte == 116 || byte == 84){ //t or T
-                printf("Press T \n\r");
                 if(on_off == 0){
                     on_off = 1;
                 }else{
                     on_off = 0;
                 }
+                xTaskNotifyGive( xPrints );
             }else if(byte == 121 || byte == 89){ // y or Y
-                printf("Press Y \n\r");
                 if(swOnOff_enable == 0){
                     swOnOff_enable = 1;
                 }else{
                     swOnOff_enable = 0;
                 }
+                xTaskNotifyGive( xPrints );
             }else if(byte == 99 || byte == 67){ //C or c
                 //config
                 // semaforo nos prints
                 //config, stop prints
                 //sinaliza task config
                 // prioridade do config tem de ser inferior a todas as outras
+                xTaskNotifyGive( xConfig );
+                ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
             }else if(byte == 97 || byte == 65){ //a or A
-                printf("Press A \n\r");
                 if(swModes_enable == 0){
                     swModes_enable = 1;
                 }else{
                     swModes_enable = 0;
                 }
+                xTaskNotifyGive( xPrints );
             }else if(byte == 49){ //1
-                printf("Press 1 \n\r");
                 mode = 1;
+                xTaskNotifyGive( xPrints );
             }else if(byte == 50){ //2
-                printf("Press 2 \n\r");
                 mode = 2;
+                xTaskNotifyGive( xPrints );
             }else if(byte == 51){ //3
-                printf("Press 3 \n\r");
                 mode = 3;
+                xTaskNotifyGive( xPrints );
             }else if(byte == 52){ //4
-                printf("Press 4 \n\r");
                 mode = 4;
+                xTaskNotifyGive( xPrints );
             }else if(byte == 43){ //+
                 printf("Press + \n\r");
                 light_int = light_int + INC_DEC_VALUE;
@@ -257,6 +266,87 @@ void keyInt(void *pvParam)
     
 }
 
+void prints(void *pvParam)
+{
+    
+    
+    for(;;){
+        ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
+        printf("Mode %d / ", mode);
+        if(on_off == 1){
+            printf(" Light ON /");
+        }else{
+            printf(" Light OFF /");
+        }
+        if(swModes_enable == 1){
+            printf(" SW Modes Enable /");
+        }else{
+            printf(" SW Modes Disable /");
+        }
+        if(mode == 1 || mode == 2){
+            if(swOnOff_enable == 1){
+                printf(" SW On_Off Enable");
+            }else{
+                printf(" SW On_Off Disable");
+            }
+        }
+        printf("\n\r");
+    }
+    
+}
+
+void config(void *pvParam)
+{
+    //TickType_t xLastWakeTime;
+    //xLastWakeTime = xTaskGetTickCount();
+    
+    
+    for(;;){
+        //vTaskDelayUntil(&xLastWakeTime, CONFIG_PERIOD_MS);
+        /* See if we can obtain the semaphore.  If the semaphore is not
+        available wait 10 ticks to see if it becomes free. */
+        ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
+        if(mode == 3){
+            printf("\n\rMODE3 - Insert the level of light intensity at which light switches [0 - 100] :");
+            intensity_light_onOff = (getNumber(3)*MAXLDR)/100;
+            if(intensity_light_onOff > MAXLDR){
+                intensity_light_onOff = MAXLDR;
+            }
+            printf("\n\rMODE3 - Insert hysteresis percentage [0 - 100] :");
+            hysteresis = (getNumber(3)*MAXLDR)/100;
+            if(hysteresis > MAXLDR){
+                hysteresis = MAXLDR;
+            }
+            printf("\n\rMODE3 - Insert  light level when off [0 - 100] :");
+            light_off_3 = (getNumber(3)*PRVALUE)/100;
+            if(light_off_3 > PRVALUE){
+                light_off_3 = PRVALUE;
+            }
+            printf("\n\rMODE3 - Insert  light level when on [0 - 100] :");
+            light_on_3 = (getNumber(3)*PRVALUE)/100;
+            if(light_on_3 > PRVALUE){
+                light_on_3 = PRVALUE;
+            }
+            printf("\n\r");
+        }else if (mode == 4){
+            printf("\n\rMODE4 - Insert  maximum light intensity[0 - 100] :");
+            maxL = (getNumber(3)*PRVALUE)/100;
+            if(maxL > PRVALUE){
+                maxL = PRVALUE;
+            }
+            printf("\n\rMODE4 - Insert  minimum light intensity [0 - 100] :");
+            minL = (getNumber(3)*PRVALUE)/100;
+            if(minL > PRVALUE){
+                minL = PRVALUE;
+            }
+            printf("\n\r");
+        }
+       xTaskNotifyGive( xKeyInt );
+        
+    }
+}
+    
+
 void decision(void *pvParam)
 {
     TickType_t xLastWakeTime;
@@ -270,19 +360,19 @@ void decision(void *pvParam)
         vTaskDelayUntil(&xLastWakeTime, DECISION_PERIOD_MS);
         switch (mode){
             case 1:
-                printf("Mode 1 \n\r");
+                //printf("Mode 1 \n\r");
                 QLightData.light_val = PRVALUE;
                 QLightData.on_off = on_off;
                 xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 break;
             case 2:
-                printf("Mode 2 \n\r");
+                //printf("Mode 2 \n\r");
                 QLightData.light_val = light_int;
                 QLightData.on_off = on_off;
                 xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 break;
             case 3:
-                printf("Mode 3 \n\r");
+                //printf("Mode 3 \n\r");
                 avg_ldr = 0;
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
@@ -299,13 +389,13 @@ void decision(void *pvParam)
                 }
                 break;
             case 4:
-                printf("Mode 4 \n\r");
+                //printf("Mode 4 \n\r");
                 avg_ldr = 0;
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
                 avg_ldr = avg_ldr/NR_ADC_SAMPLES;
-                printf("LDR %f \n\r", avg_ldr);
+                //printf("LDR %f \n\r", avg_ldr);
                 if(avg_ldr < ligth_level - 20){
                     light_int = light_int - INC_DEC_VALUE;
                     if(light_int<minL){
@@ -337,11 +427,11 @@ void actuation(void *pvParam)
     for(;;){
         xStatus=xQueueReceive(xLightQueue,(void *)&QLightData,portMAX_DELAY);
         if(QLightData.on_off == 0){
-            printf("OFF \n\r");
+            //printf("OFF \n\r");
             OC1R = 0;
             LED_TRIS = 1;
         }else{
-            printf("ON %d \n\r", QLightData.light_val);
+            //printf("ON %d \n\r", QLightData.light_val);
             OC1R = QLightData.light_val;
             if(QLightData.light_val == 0){
                 LED_TRIS = 1;
@@ -421,9 +511,11 @@ int mainLightController( void )
     xTaskCreate( sensorAcq, ( const signed char * const ) "sensorAcq", configMINIMAL_STACK_SIZE, NULL, SENSOR_ACQ_PRIORITY, NULL );
     xTaskCreate( swInt, ( const signed char * const ) "swInt", configMINIMAL_STACK_SIZE, NULL, SW_INT_PRIORITY, NULL );
     xTaskCreate( btInt, ( const signed char * const ) "btInt", configMINIMAL_STACK_SIZE, NULL, BT_INT_PRIORITY, NULL );
-    xTaskCreate( keyInt, ( const signed char * const ) "keyInt", configMINIMAL_STACK_SIZE, NULL, KEY_INT_PRIORITY, NULL );
+    xTaskCreate( keyInt, ( const signed char * const ) "keyInt", configMINIMAL_STACK_SIZE, NULL, KEY_INT_PRIORITY, &xKeyInt );
     xTaskCreate( decision, ( const signed char * const ) "decision", configMINIMAL_STACK_SIZE, NULL, DECISION_PRIORITY, NULL );
     xTaskCreate( actuation, ( const signed char * const ) "actuation", configMINIMAL_STACK_SIZE, NULL, ACTUATION_PRIORITY, NULL );
+    xTaskCreate( config, ( const signed char * const ) "config", configMINIMAL_STACK_SIZE, NULL, CONFIG_PRIORITY, &xConfig );
+    xTaskCreate( prints, ( const signed char * const ) "prints", configMINIMAL_STACK_SIZE, NULL, PRINTS_PRIORITY, &xPrints );
 
         /* Finally start the scheduler. */
 	vTaskStartScheduler();
