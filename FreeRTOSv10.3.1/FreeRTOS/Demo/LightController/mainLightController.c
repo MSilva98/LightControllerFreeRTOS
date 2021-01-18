@@ -37,7 +37,7 @@
 
 /* Periods of the tasks*/
 #define SENSOR_PERIOD_MS    (100 / portTICK_RATE_MS)
-#define SW_INT_PERIOD_MS    (500 / portTICK_RATE_MS)
+#define SW_INT_PERIOD_MS    (350 / portTICK_RATE_MS)
 #define BT_INT_PERIOD_MS    (150 / portTICK_RATE_MS)
 #define KEY_INT_PERIOD_MS   (100 / portTICK_RATE_MS)
 #define DECISION_PERIOD_MS  (80 / portTICK_RATE_MS)
@@ -74,7 +74,7 @@ static TaskHandle_t xConfig = NULL, xKeyInt = NULL, xPrints = NULL;
 
 //Semaphores
 
-SemaphoreHandle_t xSem_ldr_values, xSem_mode, xSem_light_int, xSem_on_off, xSem_swModes_enable, xSem_swOnOff_enable , xSem_mode3, xSem_mode4 = NULL;
+SemaphoreHandle_t xSem_ldr_values, xSem_mode, xSem_light_int, xSem_on_off, xSem_swModes_enable, xSem_swOnOff_enable  = NULL;
 
 /*global vars*/
 
@@ -163,16 +163,13 @@ void swInt(void *pvParam)
                 default:
                     break;
             }
-            // preemption
             xSemaphoreGive( xSem_mode );
         }
         if(swOnOff_enable == 1){
-            // no_preemption
             xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
             on_off = SW_ON_OFF_PIN;
             xSemaphoreGive( xSem_on_off );
             xTaskNotifyGive( xPrints );
-            // preemption
         }
     }
     
@@ -188,20 +185,16 @@ void btInt(void *pvParam)
         vTaskDelayUntil(&xLastWakeTime, BT_INT_PERIOD_MS);
         xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
         if(LEFT_BUTTON){        // increase
-            // no_preemption
             light_int = light_int + INC_DEC_VALUE;
             if(light_int>PRVALUE){
                 light_int = PRVALUE;
             }
-            // preemption
         }
         if(RIGHT_BUTTON){ // decrease
-            // no_preemption
             light_int = light_int - INC_DEC_VALUE;
             if(light_int<0){
                 light_int = 0;
             }
-            // preemption
         }
         xSemaphoreGive(xSem_light_int);
     }
@@ -220,32 +213,32 @@ void keyInt(void *pvParam)
         if(GetChar( &byte ) == UART_SUCCESS){
             if(byte == 116 || byte == 84){ //t or T
                 xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
-                if(on_off == 0){
-                    on_off = 1;
-                }else{
-                    on_off = 0;
-                }
+                //if(on_off == 0){
+                //    on_off = 1;
+                //}else{
+                //    on_off = 0;
+                //}
+                on_off = !on_off;
                 xSemaphoreGive(xSem_on_off);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 121 || byte == 89){ // y or Y
                 xSemaphoreTake( xSem_swOnOff_enable , ( TickType_t ) 10 );
-                if(swOnOff_enable == 0){
-                    swOnOff_enable = 1;
-                }else{
-                    swOnOff_enable = 0;
-                }
+                //if(swOnOff_enable == 0){
+                //    swOnOff_enable = 1;
+                //}else{
+                //    swOnOff_enable = 0;
+                //}
+                swOnOff_enable = !swOnOff_enable;
                 xSemaphoreGive(xSem_swOnOff_enable);
                 xTaskNotifyGive( xPrints );
-            }else if(byte == 99 || byte == 67){ //C or c
-                xTaskNotifyGive( xConfig );
-                ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
             }else if(byte == 97 || byte == 65){ //a or A
                 xSemaphoreTake( xSem_swModes_enable , ( TickType_t ) 10 );
-                if(swModes_enable == 0){
-                    swModes_enable = 1;
-                }else{
-                    swModes_enable = 0;
-                }
+                //if(swModes_enable == 0){
+                //    swModes_enable = 1;
+                //}else{
+                //    swModes_enable = 0;
+                //}
+                swModes_enable = !swModes_enable;
                 xSemaphoreGive(xSem_swModes_enable);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 49){ //1
@@ -322,7 +315,7 @@ void prints(void *pvParam)
     }
     
 }
-
+/*
 void config(void *pvParam)
 {
     uint8_t mesg[50];
@@ -381,7 +374,7 @@ void config(void *pvParam)
         xTaskNotifyGive( xKeyInt );
     }
 }
-    
+    */
 
 void decision(void *pvParam)
 {
@@ -420,7 +413,6 @@ void decision(void *pvParam)
                 }
                 xSemaphoreGive(xSem_ldr_values);
                 avg_ldr = avg_ldr/NR_ADC_SAMPLES;
-                xSemaphoreTake( xSem_mode3 , ( TickType_t ) portMAX_DELAY );
                 if(avg_ldr < (intensity_light_onOff - hysteresis)){
                     QLightData.light_val = light_off_3;
                     QLightData.on_off = 1;
@@ -430,7 +422,6 @@ void decision(void *pvParam)
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }
-                xSemaphoreGive(xSem_mode3);
                 break;
             case 4:
                 avg_ldr = 0;
@@ -440,7 +431,6 @@ void decision(void *pvParam)
                 }
                 xSemaphoreGive(xSem_ldr_values);
                 avg_ldr = avg_ldr/NR_ADC_SAMPLES;
-                xSemaphoreTake( xSem_mode4 , ( TickType_t ) portMAX_DELAY );
                 if(avg_ldr < ligth_level - 20){
                     xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
                     light_int = light_int - INC_DEC_VALUE;
@@ -462,7 +452,6 @@ void decision(void *pvParam)
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }
-                xSemaphoreGive(xSem_mode4);
                 break;
         }
         xSemaphoreGive(xSem_mode);
@@ -563,8 +552,6 @@ int mainLightController( void )
     xSem_on_off = xSemaphoreCreateMutex();
     xSem_swModes_enable = xSemaphoreCreateMutex();
     xSem_swOnOff_enable = xSemaphoreCreateMutex();
-    xSem_mode3 = xSemaphoreCreateMutex();
-    xSem_mode4 = xSemaphoreCreateMutex();
     
     /* Create the tasks defined within this file. */
     xTaskCreate( sensorAcq, ( const signed char * const ) "sensorAcq", configMINIMAL_STACK_SIZE, NULL, SENSOR_ACQ_PRIORITY, NULL );
@@ -573,7 +560,6 @@ int mainLightController( void )
     xTaskCreate( keyInt, ( const signed char * const ) "keyInt", configMINIMAL_STACK_SIZE, NULL, KEY_INT_PRIORITY, &xKeyInt );
     xTaskCreate( decision, ( const signed char * const ) "decision", configMINIMAL_STACK_SIZE, NULL, DECISION_PRIORITY, NULL );
     xTaskCreate( actuation, ( const signed char * const ) "actuation", configMINIMAL_STACK_SIZE, NULL, ACTUATION_PRIORITY, NULL );
-    xTaskCreate( config, ( const signed char * const ) "config", configMINIMAL_STACK_SIZE, NULL, CONFIG_PRIORITY, &xConfig );
     xTaskCreate( prints, ( const signed char * const ) "prints", configMINIMAL_STACK_SIZE, NULL, PRINTS_PRIORITY, &xPrints );
 
         /* Finally start the scheduler. */
