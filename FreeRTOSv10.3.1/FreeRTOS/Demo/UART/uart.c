@@ -116,14 +116,16 @@ int GetChar(uint8_t *byte)
 	{
 		dummy = U1RXREG; 			// dummy read to clear FERR/PERR
 		U1STAbits.OERR = 0;			// clear OERR to keep receiving
+        //printf("ERRO");
 	}
 
 	if(U1STAbits.URXDA)
 	{
 		*byte = U1ARXREG;		        // get data from UART RX FIFO
+        //printf("SUCCESS");
 		return UART_SUCCESS;
 	}
-	
+	//printf("FAIl\n\r");
 	return UART_FAIL;
 
 }

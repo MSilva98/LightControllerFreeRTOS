@@ -26,6 +26,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#include "semphr.h" 
 
 
 /* App includes */
@@ -71,6 +72,10 @@ struct QueueLightData_Type {
 
 static TaskHandle_t xConfig = NULL, xKeyInt = NULL, xPrints = NULL;
 
+//Semaphores
+
+SemaphoreHandle_t xSem_ldr_values, xSem_mode, xSem_light_int, xSem_on_off, xSem_swModes_enable, xSem_swOnOff_enable , xSem_mode3, xSem_mode4 = NULL;
+
 /*global vars*/
 
 uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que vem do LDR / ADC
@@ -111,8 +116,10 @@ void sensorAcq(void *pvParam)
         AD1CON1bits.ASAM=1; // Start conversion
         while(IFS1bits.AD1IF == 0); // Wait for EOC
         // no_preemption
+        xSemaphoreTake( xSem_ldr_values , ( TickType_t ) 10 );
         ldr_values[i] = ADC1BUF0;
         // preemption
+        xSemaphoreGive( xSem_ldr_values );
         i++;
         if(i>NR_ADC_SAMPLES)
             i = 0;
@@ -130,6 +137,7 @@ void swInt(void *pvParam)
         vTaskDelayUntil(&xLastWakeTime, SW_INT_PERIOD_MS);
         if(swModes_enable){
             // no_preemption
+            xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
             switch(10*MODE_SW_1 + MODE_SW_0){
                 case 0:
                     
@@ -156,10 +164,13 @@ void swInt(void *pvParam)
                     break;
             }
             // preemption
+            xSemaphoreGive( xSem_mode );
         }
         if(swOnOff_enable == 1){
             // no_preemption
+            xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
             on_off = SW_ON_OFF_PIN;
+            xSemaphoreGive( xSem_on_off );
             xTaskNotifyGive( xPrints );
             // preemption
         }
@@ -175,9 +186,9 @@ void btInt(void *pvParam)
     
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, BT_INT_PERIOD_MS);
+        xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
         if(LEFT_BUTTON){        // increase
             // no_preemption
-            printf("Press BT L + \n\r");
             light_int = light_int + INC_DEC_VALUE;
             if(light_int>PRVALUE){
                 light_int = PRVALUE;
@@ -186,13 +197,13 @@ void btInt(void *pvParam)
         }
         if(RIGHT_BUTTON){ // decrease
             // no_preemption
-            printf("Press BT R -\n\r");
             light_int = light_int - INC_DEC_VALUE;
             if(light_int<0){
                 light_int = 0;
             }
             // preemption
         }
+        xSemaphoreGive(xSem_light_int);
     }
     
 }
@@ -208,58 +219,69 @@ void keyInt(void *pvParam)
         vTaskDelayUntil(&xLastWakeTime, KEY_INT_PERIOD_MS);
         if(GetChar( &byte ) == UART_SUCCESS){
             if(byte == 116 || byte == 84){ //t or T
+                xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
                 if(on_off == 0){
                     on_off = 1;
                 }else{
                     on_off = 0;
                 }
+                xSemaphoreGive(xSem_on_off);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 121 || byte == 89){ // y or Y
+                xSemaphoreTake( xSem_swOnOff_enable , ( TickType_t ) 10 );
                 if(swOnOff_enable == 0){
                     swOnOff_enable = 1;
                 }else{
                     swOnOff_enable = 0;
                 }
+                xSemaphoreGive(xSem_swOnOff_enable);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 99 || byte == 67){ //C or c
-                //config
-                // semaforo nos prints
-                //config, stop prints
-                //sinaliza task config
-                // prioridade do config tem de ser inferior a todas as outras
                 xTaskNotifyGive( xConfig );
                 ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
             }else if(byte == 97 || byte == 65){ //a or A
+                xSemaphoreTake( xSem_swModes_enable , ( TickType_t ) 10 );
                 if(swModes_enable == 0){
                     swModes_enable = 1;
                 }else{
                     swModes_enable = 0;
                 }
+                xSemaphoreGive(xSem_swModes_enable);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 49){ //1
+                xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
                 mode = 1;
+                xSemaphoreGive(xSem_mode);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 50){ //2
+                xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
                 mode = 2;
+                xSemaphoreGive(xSem_mode);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 51){ //3
+                xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
                 mode = 3;
+                xSemaphoreGive(xSem_mode);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 52){ //4
+                xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
                 mode = 4;
+                xSemaphoreGive(xSem_mode);
                 xTaskNotifyGive( xPrints );
             }else if(byte == 43){ //+
-                printf("Press + \n\r");
+                xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
                 light_int = light_int + INC_DEC_VALUE;
                 if(light_int>PRVALUE){
                     light_int = PRVALUE;
                 }
+                xSemaphoreGive(xSem_light_int);
             }else if(byte == 45){ //-
-                printf("Press - \n\r");
+                xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
                 light_int = light_int - INC_DEC_VALUE;
                 if(light_int<0){
                     light_int = 0;
                 }
+                xSemaphoreGive(xSem_light_int);
             }
         }
     }
@@ -268,81 +290,95 @@ void keyInt(void *pvParam)
 
 void prints(void *pvParam)
 {
-    
-    
+    uint8_t mesg[50];
     for(;;){
         ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-        printf("Mode %d / ", mode);
-        if(on_off == 1){
-            printf(" Light ON /");
-        }else{
-            printf(" Light OFF /");
-        }
+        xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
+        sprintf(mesg, "Mode %d / ", mode);
         if(swModes_enable == 1){
-            printf(" SW Modes Enable /");
+            sprintf(mesg + strlen(mesg)," SW Modes Enable");
         }else{
-            printf(" SW Modes Disable /");
+            sprintf(mesg + strlen(mesg)," SW Modes Disable");
         }
         if(mode == 1 || mode == 2){
+            xSemaphoreTake( xSem_swOnOff_enable , ( TickType_t ) 10 );
             if(swOnOff_enable == 1){
-                printf(" SW On_Off Enable");
+                sprintf(mesg + strlen(mesg)," / SW On_Off Enable");
             }else{
-                printf(" SW On_Off Disable");
+                sprintf(mesg + strlen(mesg)," / SW On_Off Disable");
             }
+            xSemaphoreGive(xSem_swOnOff_enable);
+            xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
+            if(on_off == 1){
+                sprintf(mesg + strlen(mesg)," / Light ON");
+            }else{
+                sprintf(mesg + strlen(mesg)," / Light OFF");
+            }
+            xSemaphoreGive(xSem_on_off);
         }
-        printf("\n\r");
+        xSemaphoreGive(xSem_mode);
+        sprintf(mesg + strlen(mesg),"\n\r");
+        PrintStr(mesg);
     }
     
 }
 
 void config(void *pvParam)
 {
-    //TickType_t xLastWakeTime;
-    //xLastWakeTime = xTaskGetTickCount();
-    
-    
+    uint8_t mesg[50];
     for(;;){
-        //vTaskDelayUntil(&xLastWakeTime, CONFIG_PERIOD_MS);
-        /* See if we can obtain the semaphore.  If the semaphore is not
-        available wait 10 ticks to see if it becomes free. */
         ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
+        xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
         if(mode == 3){
-            printf("\n\rMODE3 - Insert the level of light intensity at which light switches [0 - 100] :");
+            xSemaphoreGive(xSem_mode);
+            xSemaphoreTake( xSem_mode3 , ( TickType_t ) 50 );
+            sprintf(mesg, "\n\rMODE3 - Insert the level of light intensity at which light switches [0 - 100] :");
+            PrintStr(mesg);
             intensity_light_onOff = (getNumber(3)*MAXLDR)/100;
             if(intensity_light_onOff > MAXLDR){
                 intensity_light_onOff = MAXLDR;
             }
-            printf("\n\rMODE3 - Insert hysteresis percentage [0 - 100] :");
+            sprintf( mesg, "\n\rMODE3 - Insert hysteresis percentage [0 - 100] :");
+            PrintStr(mesg);
             hysteresis = (getNumber(3)*MAXLDR)/100;
             if(hysteresis > MAXLDR){
                 hysteresis = MAXLDR;
             }
-            printf("\n\rMODE3 - Insert  light level when off [0 - 100] :");
+            sprintf(mesg, "\n\rMODE3 - Insert  light level when off [0 - 100] :");
+            PrintStr(mesg);
             light_off_3 = (getNumber(3)*PRVALUE)/100;
             if(light_off_3 > PRVALUE){
                 light_off_3 = PRVALUE;
             }
-            printf("\n\rMODE3 - Insert  light level when on [0 - 100] :");
+            printf(mesg, "\n\rMODE3 - Insert  light level when on [0 - 100] :");
+            PrintStr(mesg);
             light_on_3 = (getNumber(3)*PRVALUE)/100;
             if(light_on_3 > PRVALUE){
                 light_on_3 = PRVALUE;
             }
-            printf("\n\r");
+            sprintf(mesg, "\n\r");
+            PrintStr(mesg);
+            xSemaphoreGive(xSem_mode3);
         }else if (mode == 4){
-            printf("\n\rMODE4 - Insert  maximum light intensity[0 - 100] :");
+            xSemaphoreGive(xSem_mode);
+            xSemaphoreTake( xSem_mode4 , ( TickType_t ) 10 );
+            sprintf(mesg, "\n\rMODE4 - Insert  maximum light intensity[0 - 100] :");
+            PrintStr(mesg);
             maxL = (getNumber(3)*PRVALUE)/100;
             if(maxL > PRVALUE){
                 maxL = PRVALUE;
             }
-            printf("\n\rMODE4 - Insert  minimum light intensity [0 - 100] :");
+            sprintf(mesg, "\n\rMODE4 - Insert  minimum light intensity [0 - 100] :");
+            PrintStr(mesg);
             minL = (getNumber(3)*PRVALUE)/100;
             if(minL > PRVALUE){
                 minL = PRVALUE;
             }
-            printf("\n\r");
+            sprintf(mesg, "\n\r");
+            PrintStr(mesg);
+            xSemaphoreGive(xSem_mode4);
         }
-       xTaskNotifyGive( xKeyInt );
-        
+        xTaskNotifyGive( xKeyInt );
     }
 }
     
@@ -358,26 +394,33 @@ void decision(void *pvParam)
     
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, DECISION_PERIOD_MS);
+        xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
         switch (mode){
             case 1:
-                //printf("Mode 1 \n\r");
                 QLightData.light_val = PRVALUE;
+                xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
                 QLightData.on_off = on_off;
+                xSemaphoreGive(xSem_on_off);
                 xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 break;
             case 2:
-                //printf("Mode 2 \n\r");
+                xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
                 QLightData.light_val = light_int;
+                xSemaphoreGive(xSem_light_int);
+                xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
                 QLightData.on_off = on_off;
+                xSemaphoreGive(xSem_on_off);
                 xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 break;
             case 3:
-                //printf("Mode 3 \n\r");
                 avg_ldr = 0;
+                xSemaphoreTake( xSem_ldr_values , ( TickType_t ) 10 );
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
+                xSemaphoreGive(xSem_ldr_values);
                 avg_ldr = avg_ldr/NR_ADC_SAMPLES;
+                xSemaphoreTake( xSem_mode3 , ( TickType_t ) portMAX_DELAY );
                 if(avg_ldr < (intensity_light_onOff - hysteresis)){
                     QLightData.light_val = light_off_3;
                     QLightData.on_off = 1;
@@ -387,36 +430,44 @@ void decision(void *pvParam)
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }
+                xSemaphoreGive(xSem_mode3);
                 break;
             case 4:
-                //printf("Mode 4 \n\r");
                 avg_ldr = 0;
+                xSemaphoreTake( xSem_ldr_values , ( TickType_t ) 10 );
                 for(i = 0; i<NR_ADC_SAMPLES; i++){
                     avg_ldr += ldr_values[i]; 
                 }
+                xSemaphoreGive(xSem_ldr_values);
                 avg_ldr = avg_ldr/NR_ADC_SAMPLES;
-                //printf("LDR %f \n\r", avg_ldr);
+                xSemaphoreTake( xSem_mode4 , ( TickType_t ) portMAX_DELAY );
                 if(avg_ldr < ligth_level - 20){
+                    xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
                     light_int = light_int - INC_DEC_VALUE;
                     if(light_int<minL){
                         light_int = minL;
                     }
                     QLightData.light_val = light_int;
+                    xSemaphoreGive(xSem_light_int);
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }else if(avg_ldr > ligth_level + 20){
-                    
+                    xSemaphoreTake( xSem_light_int , ( TickType_t ) 10 );
                     light_int = light_int + INC_DEC_VALUE;
                     if(light_int>maxL){
                         light_int = maxL;
                     }
                     QLightData.light_val = light_int;
+                    xSemaphoreGive(xSem_light_int);
                     QLightData.on_off = 1;
                     xQueueSend( xLightQueue,( void * ) &QLightData,( TickType_t ) 100 );
                 }
+                xSemaphoreGive(xSem_mode4);
                 break;
         }
+        xSemaphoreGive(xSem_mode);
     }
+            
 }
 
 void actuation(void *pvParam)
@@ -427,11 +478,9 @@ void actuation(void *pvParam)
     for(;;){
         xStatus=xQueueReceive(xLightQueue,(void *)&QLightData,portMAX_DELAY);
         if(QLightData.on_off == 0){
-            //printf("OFF \n\r");
             OC1R = 0;
             LED_TRIS = 1;
         }else{
-            //printf("ON %d \n\r", QLightData.light_val);
             OC1R = QLightData.light_val;
             if(QLightData.light_val == 0){
                 LED_TRIS = 1;
@@ -507,6 +556,16 @@ int mainLightController( void )
     /* Create Queues*/
     xLightQueue = xQueueCreate(lightQueueQUEUE_LEN, sizeof(struct QueueLightData_Type));  
     
+    /*Create Semaphores*/
+    xSem_ldr_values = xSemaphoreCreateMutex();
+    xSem_mode = xSemaphoreCreateMutex();
+    xSem_light_int = xSemaphoreCreateMutex();
+    xSem_on_off = xSemaphoreCreateMutex();
+    xSem_swModes_enable = xSemaphoreCreateMutex();
+    xSem_swOnOff_enable = xSemaphoreCreateMutex();
+    xSem_mode3 = xSemaphoreCreateMutex();
+    xSem_mode4 = xSemaphoreCreateMutex();
+    
     /* Create the tasks defined within this file. */
     xTaskCreate( sensorAcq, ( const signed char * const ) "sensorAcq", configMINIMAL_STACK_SIZE, NULL, SENSOR_ACQ_PRIORITY, NULL );
     xTaskCreate( swInt, ( const signed char * const ) "swInt", configMINIMAL_STACK_SIZE, NULL, SW_INT_PRIORITY, NULL );
@@ -528,7 +587,6 @@ int mainLightController( void )
 void visr_tmr2(void){
     LED_PIN = 1;
     IFS0bits.T2IF = 0;
-
 }
 
 void visr_oc1(void){
