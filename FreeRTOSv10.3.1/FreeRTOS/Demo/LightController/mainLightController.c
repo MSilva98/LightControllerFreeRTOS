@@ -96,7 +96,7 @@ int ligth_level = 200; //valor de intensidade pretendido
 int minL = (0*PRVALUE)/100; 
 int maxL = (100*PRVALUE)/100;
 
-
+void config(void);
 /*
  * Prototypes and tasks
  */
@@ -208,29 +208,14 @@ void keyInt(void *pvParam)
         if(GetChar( &byte ) == UART_SUCCESS){
             if(byte == 116 || byte == 84){ //t or T
                 xSemaphoreTake( xSem_on_off , ( TickType_t ) 10 );
-                //if(on_off == 0){
-                //    on_off = 1;
-                //}else{
-                //    on_off = 0;
-                //}
                 on_off = !on_off;
                 xSemaphoreGive(xSem_on_off);
             }else if(byte == 121 || byte == 89){ // y or Y
                 xSemaphoreTake( xSem_swOnOff_enable , ( TickType_t ) 10 );
-                //if(swOnOff_enable == 0){
-                //    swOnOff_enable = 1;
-                //}else{
-                //    swOnOff_enable = 0;
-                //}
                 swOnOff_enable = !swOnOff_enable;
                 xSemaphoreGive(xSem_swOnOff_enable);
             }else if(byte == 97 || byte == 65){ //a or A
                 xSemaphoreTake( xSem_swModes_enable , ( TickType_t ) 10 );
-                //if(swModes_enable == 0){
-                //    swModes_enable = 1;
-                //}else{
-                //    swModes_enable = 0;
-                //}
                 swModes_enable = !swModes_enable;
                 xSemaphoreGive(xSem_swModes_enable);
             }else if(byte == 49){ //1
@@ -277,7 +262,7 @@ void prints(void *pvParam)
     for(;;){
         vTaskDelayUntil(&xLastWakeTime, PRINTS_PERIOD_MS);
         xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
-        printf("Mode %d / ", mode);
+        printf("Mode %d /", mode);
         xSemaphoreTake( xSem_swModes_enable, ( TickType_t ) 10 );
         if(swModes_enable == 1){
             printf(" SW Modes Enable");
@@ -306,66 +291,7 @@ void prints(void *pvParam)
     }
     
 }
-/*
-void config(void *pvParam)
-{
-    uint8_t mesg[50];
-    for(;;){
-        ulTaskNotifyTake( pdTRUE, portMAX_DELAY );
-        xSemaphoreTake( xSem_mode , ( TickType_t ) 10 );
-        if(mode == 3){
-            xSemaphoreGive(xSem_mode);
-            xSemaphoreTake( xSem_mode3 , ( TickType_t ) 50 );
-            sprintf(mesg, "\n\rMODE3 - Insert the level of light intensity at which light switches [0 - 100] :");
-            PrintStr(mesg);
-            intensity_light_onOff = (getNumber(3)*MAXLDR)/100;
-            if(intensity_light_onOff > MAXLDR){
-                intensity_light_onOff = MAXLDR;
-            }
-            sprintf( mesg, "\n\rMODE3 - Insert hysteresis percentage [0 - 100] :");
-            PrintStr(mesg);
-            hysteresis = (getNumber(3)*MAXLDR)/100;
-            if(hysteresis > MAXLDR){
-                hysteresis = MAXLDR;
-            }
-            sprintf(mesg, "\n\rMODE3 - Insert  light level when off [0 - 100] :");
-            PrintStr(mesg);
-            light_off_3 = (getNumber(3)*PRVALUE)/100;
-            if(light_off_3 > PRVALUE){
-                light_off_3 = PRVALUE;
-            }
-            printf(mesg, "\n\rMODE3 - Insert  light level when on [0 - 100] :");
-            PrintStr(mesg);
-            light_on_3 = (getNumber(3)*PRVALUE)/100;
-            if(light_on_3 > PRVALUE){
-                light_on_3 = PRVALUE;
-            }
-            sprintf(mesg, "\n\r");
-            PrintStr(mesg);
-            xSemaphoreGive(xSem_mode3);
-        }else if (mode == 4){
-            xSemaphoreGive(xSem_mode);
-            xSemaphoreTake( xSem_mode4 , ( TickType_t ) 10 );
-            sprintf(mesg, "\n\rMODE4 - Insert  maximum light intensity[0 - 100] :");
-            PrintStr(mesg);
-            maxL = (getNumber(3)*PRVALUE)/100;
-            if(maxL > PRVALUE){
-                maxL = PRVALUE;
-            }
-            sprintf(mesg, "\n\rMODE4 - Insert  minimum light intensity [0 - 100] :");
-            PrintStr(mesg);
-            minL = (getNumber(3)*PRVALUE)/100;
-            if(minL > PRVALUE){
-                minL = PRVALUE;
-            }
-            sprintf(mesg, "\n\r");
-            PrintStr(mesg);
-            xSemaphoreGive(xSem_mode4);
-        }
-        xTaskNotifyGive( xKeyInt );
-    }
-}
-    */
+
 
 void decision(void *pvParam)
 {
@@ -552,9 +478,10 @@ int mainLightController( void )
     xTaskCreate( decision, ( const signed char * const ) "decision", configMINIMAL_STACK_SIZE, NULL, DECISION_PRIORITY, NULL );
     xTaskCreate( actuation, ( const signed char * const ) "actuation", configMINIMAL_STACK_SIZE, NULL, ACTUATION_PRIORITY, NULL );
     xTaskCreate( prints, ( const signed char * const ) "prints", configMINIMAL_STACK_SIZE, NULL, PRINTS_PRIORITY, NULL );
-
+    
+    config();
         /* Finally start the scheduler. */
-	vTaskStartScheduler();
+	//vTaskStartScheduler();
 
 	/* Will only reach here if there is insufficient heap available to start
 	the scheduler. */
@@ -571,3 +498,52 @@ void visr_oc1(void){
     IFS0bits.OC1IF=0;
     OC1CONbits.ON=1;
 }
+
+
+void config( )
+{
+    uint8_t mesg[50];
+    sprintf(mesg, "\n\rMODE3 - Insert the level of light intensity at which light switches [0 - 100] :");
+    PrintStr(mesg);
+    intensity_light_onOff = (getNumber(3)*MAXLDR)/100;
+    if(intensity_light_onOff > MAXLDR){
+        intensity_light_onOff = MAXLDR;
+    }
+    sprintf( mesg, "\n\rMODE3 - Insert hysteresis percentage [0 - 100] :");
+    PrintStr(mesg);
+    hysteresis = (getNumber(3)*MAXLDR)/100;
+    if(hysteresis > MAXLDR){
+        hysteresis = MAXLDR;
+    }
+    sprintf(mesg, "\n\rMODE3 - Insert  light level when off [0 - 100] :");
+    PrintStr(mesg);
+    light_off_3 = (getNumber(3)*PRVALUE)/100;
+    if(light_off_3 > PRVALUE){
+        light_off_3 = PRVALUE;
+    }
+    sprintf(mesg, "\n\rMODE3 - Insert  light level when on [0 - 100] :");
+    PrintStr(mesg);
+    light_on_3 = (getNumber(3)*PRVALUE)/100;
+    if(light_on_3 > PRVALUE){
+        light_on_3 = PRVALUE;
+    }
+    sprintf(mesg, "\n\r");
+    PrintStr(mesg);
+    sprintf(mesg, "\n\rMODE4 - Insert  maximum light intensity[0 - 100] :");
+    PrintStr(mesg);
+    maxL = (getNumber(3)*PRVALUE)/100;
+    if(maxL > PRVALUE){
+        maxL = PRVALUE;
+    }
+    sprintf(mesg, "\n\rMODE4 - Insert  minimum light intensity [0 - 100] :");
+    PrintStr(mesg);
+    minL = (getNumber(3)*PRVALUE)/100;
+    if(minL > PRVALUE){
+        minL = PRVALUE;
+    }
+    sprintf(mesg, "\n\r");
+    PrintStr(mesg);
+    
+    vTaskStartScheduler();
+}
+  
