@@ -71,7 +71,7 @@ uint8_t swOnOff_enable = 1; // 0 - disable     1 - enable
 int intensity_light_onOff = (20*MAXLDR)/100; 
 int hysteresis = (5*MAXLDR)/100;
 int light_off_3 = (0*PRVALUE)/100; 
-int light_on_3 = (100*PRVALUE)/100; "
+int light_on_3 = (100*PRVALUE)/100; 
 
 //default values mode 4
 int ligth_level = 200; 
