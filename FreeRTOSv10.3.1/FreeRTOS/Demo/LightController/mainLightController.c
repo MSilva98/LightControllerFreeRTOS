@@ -1,20 +1,3 @@
-/*
- * Paulo Pedreiras, Apr/2020
- *
- * FREERTOS demo for ChipKit MAX32 board
- * - Creates two periodic tasks
- * - One toggles Led LD4, other is a long (interfering)task that 
- *      activates LD5 when executing 
- * - When the interfering task has higher priority interference becomes visible
- *      - LD4 does not blink at the right rate
- *
- * Environment:
- * - MPLAB 5.35
- * - XC32 V2.240
- * - FreeRTOS V10.3.1
- *
- *
- */
 
 /* Standard includes. */
 #include <stdio.h>
@@ -42,7 +25,6 @@
 #define KEY_INT_PERIOD_MS   (100 / portTICK_RATE_MS)
 #define DECISION_PERIOD_MS  (80 / portTICK_RATE_MS)
 #define PRINTS_PERIOD_MS  (500 / portTICK_RATE_MS)
-//#define ACTUATION_PERIOD_MS (100 / portTICK_RATE_MS)
 
 /* Priorities of the application tasks (high numb. -> high prio.) */
 #define SENSOR_ACQ_PRIORITY (tskIDLE_PRIORITY + 2)
@@ -78,21 +60,21 @@ SemaphoreHandle_t xSem_ldr_values, xSem_mode, xSem_light_int, xSem_on_off, xSem_
 
 /*global vars*/
 
-uint32_t ldr_values[NR_ADC_SAMPLES]; //valores que vem do LDR / ADC
+uint32_t ldr_values[NR_ADC_SAMPLES]; // LDR / ADC values
 uint8_t mode = 1; //system mode
-int light_int = PRVALUE/2; //Light intensity value OC1R - valor com a luz h� de ficar
+int light_int = PRVALUE/2; //Light intensity value OC1R 
 uint8_t on_off = 1;
 uint8_t swModes_enable = 1; // 0 - disable     1 - enable
 uint8_t swOnOff_enable = 1; // 0 - disable     1 - enable
 
 //default values mode 3
-int intensity_light_onOff = (20*MAXLDR)/100; //intensidade a que a luz liga e desliga
+int intensity_light_onOff = (20*MAXLDR)/100; 
 int hysteresis = (5*MAXLDR)/100;
-int light_off_3 = (0*PRVALUE)/100; //Valor quando a luz est� "desligada"
-int light_on_3 = (100*PRVALUE)/100; //Valor quando a luz est� "ligada"
+int light_off_3 = (0*PRVALUE)/100; 
+int light_on_3 = (100*PRVALUE)/100; "
 
 //default values mode 4
-int ligth_level = 200; //valor de intensidade pretendido
+int ligth_level = 200; 
 int minL = (0*PRVALUE)/100; 
 int maxL = (100*PRVALUE)/100;
 
